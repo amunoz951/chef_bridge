@@ -20,6 +20,7 @@ require 'json'
 require 'easy_json_config'
 require 'easy_format'
 require 'easy_io'
+
 require_relative 'chef_bridge/config'
 require_relative 'chef_bridge/data_bag'
 require_relative 'chef_bridge/node'
