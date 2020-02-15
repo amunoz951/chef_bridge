@@ -2,7 +2,7 @@ module ChefBridge
   module_function
 
   def config
-    @config ||= EasyJson.config(defaults: defaults)
+    @config ||= EasyJSON.config(defaults: defaults)
   end
 
   def defaults
@@ -11,7 +11,7 @@ module ChefBridge
         'policy_group' => nil,
       },
       'paths' => {
-        'cache' => nil,
+        'cache' => Dir.tmpdir,
       },
     }
   end

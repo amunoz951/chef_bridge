@@ -17,6 +17,8 @@
 
 require 'fileutils'
 require 'json'
+require 'tmpdir'
+require 'socket'
 require 'easy_json_config'
 require 'easy_format'
 require 'easy_io'
