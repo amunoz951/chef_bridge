@@ -2,6 +2,11 @@ module ChefBridge
   module Node
     module_function
 
+    def local(refresh: false)
+      @node = ChefBridge::Node.search_by_hostname(Socket.gethostname).first if refresh
+      @node ||= ChefBridge::Node.search_by_hostname(Socket.gethostname).first
+    end
+
     def search_by_policy_name_and_group(policy_name, policy_group = ChefBridge.config['environment']['policy_group'], exclude_rundeck_disabled_nodes: true)
       knife_search_text = "policy_name:#{policy_name} AND policy_group:#{policy_group}"
       knife_search_text += ' AND !rundeck_disabled:true' if exclude_rundeck_disabled_nodes
