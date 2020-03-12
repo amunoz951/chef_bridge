@@ -18,8 +18,10 @@ module ChefBridge
       EasyIO.run_command_on_remote_hosts(servers, command, credentials, command_message: command_message, shell_type: shell_type, tail_count: tail_count, set_as_trusted_host: set_as_trusted_host)
     end
 
+    # Multiple policy names can be separated with a forward slash
     def search_by_policy_name_and_group(policy_name, policy_group = ChefBridge.config['environment']['policy_group'], exclude_rundeck_disabled_nodes: true)
-      knife_search_text = "policy_name:#{policy_name} AND policy_group:#{policy_group}"
+      policy_names = policy_name.gsub('/', ' OR policy_name:')
+      knife_search_text = "(policy_name:#{policy_names}) AND policy_group:#{policy_group}"
       knife_search_text += ' AND !rundeck_disabled:true' if exclude_rundeck_disabled_nodes
       attributes(knife_search_text)
     end
