@@ -5,7 +5,7 @@ module ChefBridge
 
     module_function
 
-    def read(data_bag, data_bag_item, create_if_missing: false, refresh: nil, ignore_errors: false, silent: false, lock_data_bag: false, lock_timeout: 900, lock_timeout_message: nil)
+    def read(data_bag, data_bag_item, create_if_missing: false, refresh: nil, ignore_errors: false, silent: false, lock_data_bag: false, lock_timeout: 900, lock_timeout_message: nil, retries: 2, retry_delay: 5)
       if lock_data_bag
         DataBag.lock(data_bag, data_bag_item, lock_timeout, lock_timeout_message, silent: silent)
         refresh = true
@@ -28,10 +28,18 @@ module ChefBridge
       @data_bags[data_bag][data_bag_item] = stdout.empty? ? { 'id' => data_bag_item } : JSON.parse(stdout.sub(/[^{\[]*/, ''))
       EasyIO.logger.debug "Data bag content: #{JSON.pretty_generate(@data_bags[data_bag][data_bag_item])}"
       @data_bags[data_bag][data_bag_item]
+    rescue
+      retry_message = 'Failed to read data bag! '
+      retry_message += "Will retry up to #{retries} more times..." unless retries == 0
+      EasyIO.logger.warn retry_message
+      raise if retries -= 1 < 0
+      EasyIO.logger.warn "Retrying in #{retry_delay} seconds...".sub(/1 seconds/, '1 second')
+      sleep(retry_delay)
+      retry
     end
 
-    def push(data_bag, data_bag_item, content, unlock_data_bag: true, silent: false)
-      data_bag_file = "#{ChefBridge.config['paths']['cache']}/data_bags/#{data_bag}/#{data_bag_item}.json"
+    def push(data_bag, data_bag_item, content, unlock_data_bag: true, silent: false, retries: 2, retry_delay: 5, create_if_missing: true)
+      data_bag_file = "#{ChefBridge.config['paths']['cache']}/chef_bridge/data_bags/#{data_bag}/#{data_bag_item}.json"
       FileUtils.mkdir_p(::File.dirname(data_bag_file))
       ::File.write(data_bag_file, content.to_json)
       script = "knife data bag from file #{data_bag} #{data_bag_file}"
@@ -41,6 +49,21 @@ module ChefBridge
       EasyIO.logger.warn "Be sure to update the data bag in git if this is not a temporary change!\nA copy of the data bag can be found at #{data_bag_file}" unless silent
       @data_bags[data_bag] = {} if @data_bags[data_bag].nil?
       @data_bags[data_bag][data_bag_item] = content # Keep the data bag up to date in memory
+      @create_if_missing_attempted = nil
+    rescue => exception
+      if exception.message.include?('The object you are looking for could not be found') && create_if_missing
+        EasyIO.execute_out("knife data bag create #{data_bag}", exception_exceptions: [/Created data_bag\[#{data_bag}\]/]) # create the data bag and retry if the data bag didn't exist and create_if_missing flag is set
+        raise if @create_if_missing_attempted && retries -= 1 < 0 # don't raise if it's the first attempt and create_if_missing is set, even if retries are set to 0
+        @create_if_missing_attempted = true
+        retry
+      end
+      retry_message = 'Failed to push data bag! '
+      retry_message += "Will retry up to #{retries} more times..." unless retries == 0
+      EasyIO.logger.warn retry_message
+      raise if retries -= 1 < 0
+      EasyIO.logger.warn "Retrying in #{retry_delay} seconds...".sub(/1 seconds/, '1 second')
+      sleep(retry_delay)
+      retry
     end
 
     def unlock_all
@@ -53,7 +76,7 @@ module ChefBridge
 
     def lock(data_bag, data_bag_item, lock_timeout, lock_timeout_message = nil, silent: false)
       EasyIO.logger.info "Locking data bag #{data_bag} #{data_bag_item}..." unless silent
-      lock_file = "#{ChefBridge.config['paths']['cache']}/data_bag_locks/#{data_bag}/#{data_bag_item}.lck"
+      lock_file = "#{ChefBridge.config['paths']['cache']}/chef_bridge/data_bag_locks/#{data_bag}/#{data_bag_item}.lck"
       ::FileUtils.mkdir_p(::File.dirname(lock_file)) unless ::File.directory?(::File.dirname(lock_file))
       elapsed_sec = 0
       @data_bag_locks["#{data_bag}_#{data_bag_item}"] = ::File.open(lock_file, File::RDWR | File::CREAT)
