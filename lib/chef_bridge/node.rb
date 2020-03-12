@@ -7,6 +7,17 @@ module ChefBridge
       @node ||= ChefBridge::Node.search_by_hostname(Socket.gethostname).first
     end
 
+    def converge_nodes(policy_name, policy_group, credentials, node_name: nil, set_as_trusted_host: false)
+      run_command_on_nodes('chef-client', policy_name, policy_group, credentials, node_name: node_name, set_as_trusted_host: set_as_trusted_host)
+    end
+
+    def run_command_on_nodes(command, policy_name, policy_group, credentials, node_name: nil, command_message: nil, shell_type: :cmd, tail_count: nil, set_as_trusted_host: false)
+      servers = ChefBridge::Node.search_by_policy_name_and_group(policy_name, policy_group).map { |server| server['automatic']['fqdn'] }.select do |remote_host|
+        node_name.nil? || node_name.strip.empty? || !(remote_host =~ /#{Regexp.escape(node_name)}/i).nil? # reject if the node name is set and it's not a match, otherwise, keep all
+      end
+      EasyIO.run_command_on_remote_hosts(servers, command, credentials, command_message: command_message, shell_type: shell_type, tail_count: tail_count, set_as_trusted_host: set_as_trusted_host)
+    end
+
     def search_by_policy_name_and_group(policy_name, policy_group = ChefBridge.config['environment']['policy_group'], exclude_rundeck_disabled_nodes: true)
       knife_search_text = "policy_name:#{policy_name} AND policy_group:#{policy_group}"
       knife_search_text += ' AND !rundeck_disabled:true' if exclude_rundeck_disabled_nodes
