@@ -1,2 +1,4 @@
 # chef_bridge
-Provides methods for common Chef Infra Server functionality such as reading/writing data bags, etc. Requires ChefDK
+Ruby gem that provides methods for accessing data from Chef Infra Server outside of the context of a chef-client converge, such as reading/writing data bags, getting node attributes, etc. 
+
+Requires Chef Workstation/ChefDK
